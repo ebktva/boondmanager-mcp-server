@@ -26,8 +26,6 @@
       "args": ["${__dirname}/dist/index.js"],
       "env": {
         "BOOND_BASE_URL": "${user_config.base_url}",
-        "BOOND_USER": "${user_config.user}",
-        "BOOND_PASSWORD": "${user_config.password}",
         "BOOND_API_TOKEN": "${user_config.api_token}"
       }
     }
@@ -42,23 +40,10 @@
     },
     "api_token": {
       "type": "string",
-      "title": "Token API (recommandé)",
-      "description": "Token JWT pour l'authentification Bearer. Méthode recommandée. Renseignez ce champ OU les champs Utilisateur + Mot de passe ci-dessous.",
+      "title": "Token API BoondManager",
+      "description": "Token JWT pour l'authentification. Pour l'obtenir : connectez-vous à BoondManager > Menu utilisateur (en haut à droite) > Mon compte > onglet « Informations de connexion » > section « Clé d'API » > cliquez sur « Générer » si aucune clé n'existe, puis copiez le token affiché.",
       "sensitive": true,
-      "required": false
-    },
-    "user": {
-      "type": "string",
-      "title": "Utilisateur (BasicAuth)",
-      "description": "Nom d'utilisateur BoondManager. À renseigner avec le mot de passe si vous n'utilisez pas le Token API.",
-      "required": false
-    },
-    "password": {
-      "type": "string",
-      "title": "Mot de passe (BasicAuth)",
-      "description": "Mot de passe BoondManager. À renseigner avec l'utilisateur si vous n'utilisez pas le Token API.",
-      "sensitive": true,
-      "required": false
+      "required": true
     }
   },
   "tools_generated": true,
