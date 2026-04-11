@@ -1,26 +1,50 @@
+import { createHmac } from "crypto";
 import { DEFAULT_BASE_URL, CHARACTER_LIMIT } from "../constants.js";
 import type { BoondConfig, JsonApiResponse, SearchParams } from "../types.js";
 
 let config: BoondConfig | null = null;
 
+function base64url(data: string | Buffer): string {
+  const b64 = Buffer.from(data).toString("base64");
+  return b64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+export function buildJwt(userToken: string, clientToken: string, clientKey: string): string {
+  const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64url(JSON.stringify({ userToken, clientToken }));
+  const signature = base64url(
+    createHmac("sha256", clientKey).update(`${header}.${payload}`).digest()
+  );
+  return `${header}.${payload}.${signature}`;
+}
+
 export function initClient(): void {
   const baseUrl = process.env.BOOND_BASE_URL || DEFAULT_BASE_URL;
 
-  // Support BasicAuth (user:password) or token-based auth
+  // Auth priority:
+  // 1. Build JWT from components (userToken + clientToken + clientKey)
+  // 2. Pre-built JWT token
+  // 3. BasicAuth (user:password)
+  const userToken = process.env.BOOND_USER_TOKEN;
+  const clientToken = process.env.BOOND_CLIENT_TOKEN;
+  const clientKey = process.env.BOOND_CLIENT_KEY;
   const token = process.env.BOOND_API_TOKEN;
   const user = process.env.BOOND_USER;
   const password = process.env.BOOND_PASSWORD;
 
   let authHeader: string;
 
-  if (token) {
+  if (userToken && clientToken && clientKey) {
+    const jwt = buildJwt(userToken, clientToken, clientKey);
+    authHeader = `Bearer ${jwt}`;
+  } else if (token) {
     authHeader = `Bearer ${token}`;
   } else if (user && password) {
     const encoded = Buffer.from(`${user}:${password}`).toString("base64");
     authHeader = `Basic ${encoded}`;
   } else {
     throw new Error(
-      "Authentication required. Set BOOND_API_TOKEN or both BOOND_USER and BOOND_PASSWORD environment variables."
+      "Authentication required. Set BOOND_USER_TOKEN + BOOND_CLIENT_TOKEN + BOOND_CLIENT_KEY, or BOOND_API_TOKEN, or both BOOND_USER and BOOND_PASSWORD."
     );
   }
 

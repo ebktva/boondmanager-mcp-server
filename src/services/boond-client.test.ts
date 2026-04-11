@@ -5,6 +5,7 @@ import {
   formatListResponse,
   formatDetailResponse,
   initClient,
+  buildJwt,
   apiRequest,
 } from "./boond-client.js";
 import { CHARACTER_LIMIT } from "../constants.js";
@@ -205,6 +206,9 @@ describe("initClient", () => {
     delete process.env.BOOND_API_TOKEN;
     delete process.env.BOOND_USER;
     delete process.env.BOOND_PASSWORD;
+    delete process.env.BOOND_USER_TOKEN;
+    delete process.env.BOOND_CLIENT_TOKEN;
+    delete process.env.BOOND_CLIENT_KEY;
     delete process.env.BOOND_BASE_URL;
   });
 
@@ -225,6 +229,45 @@ describe("initClient", () => {
     process.env.BOOND_USER = "user";
     process.env.BOOND_PASSWORD = "pass";
     expect(() => initClient()).not.toThrow();
+  });
+
+  it("should not throw when JWT components are set", () => {
+    process.env.BOOND_USER_TOKEN = "user-token";
+    process.env.BOOND_CLIENT_TOKEN = "client-token";
+    process.env.BOOND_CLIENT_KEY = "client-key";
+    expect(() => initClient()).not.toThrow();
+  });
+});
+
+describe("buildJwt", () => {
+  it("should produce a valid 3-part JWT", () => {
+    const jwt = buildJwt("user-tok", "client-tok", "secret");
+    const parts = jwt.split(".");
+    expect(parts).toHaveLength(3);
+  });
+
+  it("should encode the correct header", () => {
+    const jwt = buildJwt("u", "c", "k");
+    const header = JSON.parse(Buffer.from(jwt.split(".")[0], "base64url").toString());
+    expect(header).toEqual({ alg: "HS256", typ: "JWT" });
+  });
+
+  it("should encode userToken and clientToken in payload", () => {
+    const jwt = buildJwt("my-user", "my-client", "key");
+    const payload = JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString());
+    expect(payload).toEqual({ userToken: "my-user", clientToken: "my-client" });
+  });
+
+  it("should produce deterministic output for same inputs", () => {
+    const a = buildJwt("u", "c", "k");
+    const b = buildJwt("u", "c", "k");
+    expect(a).toBe(b);
+  });
+
+  it("should produce different output for different keys", () => {
+    const a = buildJwt("u", "c", "key1");
+    const b = buildJwt("u", "c", "key2");
+    expect(a).not.toBe(b);
   });
 });
 

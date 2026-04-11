@@ -131,9 +131,15 @@ Every tool must declare annotations:
 
 ## Authentication
 
-Configured via environment variables (never hardcoded):
-- `BOOND_USER` + `BOOND_PASSWORD` (BasicAuth, base64-encoded)
-- `BOOND_API_TOKEN` (JWT Bearer)
+Configured via environment variables (never hardcoded), in priority order:
+
+1. **JWT from components** (recommended):
+   - `BOOND_USER_TOKEN` — User token (BoondManager → Mon compte → Clé d'API)
+   - `BOOND_CLIENT_TOKEN` — Client token (Administration → Espace Développeur → API / Sandbox)
+   - `BOOND_CLIENT_KEY` — Client secret key (Administration → Espace Développeur → API / Sandbox)
+   - The server generates the JWT (HS256) automatically from these 3 values.
+2. **Pre-built JWT**: `BOOND_API_TOKEN` (JWT Bearer)
+3. **BasicAuth**: `BOOND_USER` + `BOOND_PASSWORD` (base64-encoded)
 - `BOOND_BASE_URL` (optional, defaults to `https://ui.boondmanager.com/api`)
 
 ## CI/CD
