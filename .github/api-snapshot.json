@@ -1,6 +1,8 @@
 {
-  "timestamp": "2026-04-26T00:00:00.000Z",
+  "timestamp": "2026-04-26T20:12:18.773Z",
   "url": "https://doc.boondmanager.com/api-externe/raml-build/",
   "endpointsCount": 0,
-  "endpoints": []
+  "endpoints": [],
+  "error": "HTTP 403 - Access blocked by Cloudflare/WAF",
+  "note": "Will retry next run"
 }
