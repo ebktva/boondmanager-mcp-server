@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.9.1] - 2026-05-20
+
+Patch correctif sur les trois outils `boond_resources_reference_{create,update,delete}` introduits en 1.9.0. La spec d'origine (issue #79) supposait des endpoints REST autonomes (`POST /resources/{id}/references`, `PUT /references/{id}`, `DELETE /references/{id}`) — sondage live de l'API : aucun de ces endpoints n'existe. Les références sont **embarquées** dans le DT (sous-objet `attributes.references[]` de `/resources/{id}/technical-data`), donc tout le CRUD passe par un `PUT /resources/{id}/technical-data` avec la liste complète à jour.
+
+### Corrigé
+
+- **`boond_resources_reference_create`** (`src/tools/resources.ts`, `src/schemas/index.ts`) — GET DT courant, append de la nouvelle référence, PUT de la liste complète. `description` devient requis côté schéma : sans, l'API renvoie `1017 - Missing required attribute`.
+- **`boond_resources_reference_update`** — requiert désormais `resourceId` en plus de `referenceId` (le tool doit fetch le DT pour patcher). Read-modify-write : GET, localise la référence par id, patch uniquement les champs fournis, PUT. Si l'id n'est pas trouvé, retourne `isError: true` avec la liste des ids existants au lieu de laisser passer un 404 opaque.
+- **`boond_resources_reference_delete`** — même pattern read-modify-write, ref filtrée par id. Requiert aussi `resourceId`.
+- **Sanitization `normalizeReferenceForApi`** (exportée) — l'API Boond renvoie `""` sur GET pour les dates vides mais **rejette `""` en PUT** (`1002 - Wrong or missing attribute`). Sans normalisation, un PUT qui ré-émet la liste existante échoue sur chaque référence ayant des dates non remplies. Strip les valeurs `null` / `undefined` / `""` de chaque référence avant l'envoi.
+- **Schéma dates** — `startMonth` / `endMonth` coerces vers int 1..12, `startYear` / `endYear` vers int 4 chiffres. L'API rejette explicitement `"05"` (`1002`) — accepte int `5` ou string `"5"`.
+
+### Tests
+
+- **+2 tests** dans `src/tools/resources.test.ts` couvrant `isError: true` quand l'id de référence est introuvable (sur update et delete). **442 tests passants** (vs 440 en 1.9.0).
+- **Validé live** sur Damien FRANCES (#36639, 7 références) : `reference_update` a rempli `startMonth: 5 / startYear: 2024 / endMonth: 1 / endYear: 2026` sur la référence Silamir Group, les 6 autres références préservées intactes, title/company/description de la référence patchée non touchés.
+
 ## [1.9.0] - 2026-05-20
 
 Le dossier technique (DT) d'une ressource passe en écriture. Jusqu'ici, `boond_resources_technical_data` permettait seulement de lire (compétences, outils, langues, expertises, références), et la seule route d'update côté ressources (`boond_resources_update`) ne couvrait que les champs d'identité. Cas d'usage déclencheur : le formulaire Google Forms envoyé aux consultants Silamir doit pouvoir réinjecter en masse les compétences/expériences déclarées sans saisie manuelle ressource par ressource.
