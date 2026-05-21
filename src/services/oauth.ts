@@ -39,14 +39,28 @@ export const oauthContext = new AsyncLocalStorage<OAuthRequestContext>();
 /**
  * Extract a Bearer token from an HTTP `Authorization` header.
  * Returns `null` for missing, malformed, or non-Bearer auth schemes.
+ *
+ * Implemented with plain string operations rather than a regex to stay
+ * O(n) on hostile inputs (e.g. an `Authorization` header full of spaces).
+ * A naive `/^Bearer\s+(.+)$/i` is flagged by CodeQL `js/polynomial-redos`
+ * because the greedy `\s+` and `.+` can backtrack against each other on
+ * adversarial whitespace-only suffixes. The implementation below has no
+ * backtracking surface.
  */
 export function extractBearerToken(header: string | string[] | undefined): string | null {
   if (!header) return null;
   const value = Array.isArray(header) ? header[0] : header;
   if (typeof value !== "string") return null;
-  const match = /^Bearer\s+(.+)$/i.exec(value.trim());
-  if (!match) return null;
-  const token = match[1].trim();
+  const trimmed = value.trim();
+  // "Bearer x" minimum length — scheme (6) + separator (1) + 1-char token.
+  if (trimmed.length < 8) return null;
+  if (trimmed.slice(0, 6).toLowerCase() !== "bearer") return null;
+  // RFC 6750 §2.1 specifies a single space, but be liberal: accept tab too
+  // since plenty of clients tab-separate. Reject anything else (covers
+  // "Bearer-something" and other accidental matches of the prefix).
+  const sep = trimmed.charCodeAt(6);
+  if (sep !== 0x20 /* SP */ && sep !== 0x09 /* HT */) return null;
+  const token = trimmed.slice(7).trim();
   return token.length > 0 ? token : null;
 }
 
