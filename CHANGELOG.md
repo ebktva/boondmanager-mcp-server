@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.1] - 2026-06-08
+
+Correctif de la création d'action (`boond_actions_create`), alignée sur les exigences réelles de l'API BoondManager, plus mises à jour de dépendances.
+
+### Fixed
+
+- **Création d'action — relation `dependsOn` obligatoire** (`src/tools/actions.ts`, `src/schemas/index.ts`) : l'API `POST /actions` exige une relation polymorphe `dependsOn` pointant vers l'entité à laquelle l'action est rattachée (sinon 422 « Missing required relationship »). Le tool envoie désormais cette relation à partir du premier identifiant fourni parmi `contactId`, `candidateId`, `resourceId`, `opportunityId` ou `projectId`, et renvoie une erreur explicite si aucun n'est présent. `companyId` n'est accepté qu'en complément d'un `contactId` (une action ne peut pas être rattachée directement à une société).
+- **`ActionCreateSchema` aligné sur l'API** : `typeOf` devient un ID numérique de dictionnaire (`setting.action.*`, via `boond_application_dictionary`) au lieu d'une chaîne libre ; les attributs sont `title` / `text` (et non `subject` / `content`) ; ajout de `opportunityId` et `projectId` comme cibles de rattachement ; dates au format ISO avec timezone.
+
+### Changed
+
+- **Dépendances** : `hono` 4.12.18 → 4.12.23 (#93), bumps des dev-dependencies (`@types/node`, `typescript-eslint`, …) (#90, #92, #97), `peter-evans/dockerhub-description` v4 → v5 (#89), image Docker de base `node` 22-alpine → 26-alpine (#88).
+- **CI** : ajout de Node 24 à la matrice de tests (#91).
+
 ## [2.1.0] - 2026-05-27
 
 Mécanisme de notification de mise à jour pour les installations `.mcpb` dans Claude Desktop (et tous les autres canaux : stdio CLI, transport HTTP, conteneur Docker).
