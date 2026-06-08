@@ -1,0 +1,115 @@
+name: Docker publish (manual)
+
+# Manual, on-demand multi-arch Docker publish to GHCR + Docker Hub.
+#
+# Use it when:
+#   - the Docker step of a `Release` run failed transiently (e.g. a Docker Hub
+#     auth.docker.io 5xx) while npm / GitHub Release / MCP Registry already
+#     succeeded — re-running the whole release job would re-publish npm and fail.
+#   - you need a release-candidate / feature-branch image without cutting a tag.
+#   - you want to re-push or re-tag an existing version ad hoc.
+#
+# Docker Hub is gated on the DOCKERHUB_TOKEN secret, so forks without it still
+# get the GHCR image instead of a hard failure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image version tag to publish (e.g. 2.2.0)"
+        required: true
+        type: string
+      ref:
+        description: "Git ref to build from (branch, tag or SHA). Defaults to the current ref."
+        required: false
+        type: string
+      platforms:
+        description: "Target platforms"
+        required: false
+        default: "linux/amd64,linux/arm64"
+        type: string
+      push_latest:
+        description: "Also move the :X, :X.Y and :latest moving tags"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_TOKEN != ''
+        uses: docker/login-action@v4
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: image_tags
+        env:
+          TAG_VERSION: ${{ inputs.tag }}
+          PUSH_LATEST: ${{ inputs.push_latest }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          NUMERIC_VERSION="$(echo "$TAG_VERSION" | sed -E 's/-.*$//')"
+          MAJOR_MINOR="$(echo "$NUMERIC_VERSION" | awk -F. '{print $1"."$2}')"
+          MAJOR="$(echo "$NUMERIC_VERSION" | awk -F. '{print $1}')"
+          GHCR_REPO="ghcr.io/${{ github.repository_owner }}/boondmanager-mcp-server"
+          DOCKERHUB_REPO="${DOCKERHUB_USERNAME}/boondmanager-mcp-server"
+          {
+            echo "tags<<EOF"
+            echo "${GHCR_REPO}:${TAG_VERSION}"
+            if [ "$PUSH_LATEST" = "true" ]; then
+              echo "${GHCR_REPO}:${MAJOR_MINOR}"
+              echo "${GHCR_REPO}:${MAJOR}"
+              echo "${GHCR_REPO}:latest"
+            fi
+            if [ -n "$DOCKERHUB_TOKEN" ] && [ -n "$DOCKERHUB_USERNAME" ]; then
+              echo "${DOCKERHUB_REPO}:${TAG_VERSION}"
+              if [ "$PUSH_LATEST" = "true" ]; then
+                echo "${DOCKERHUB_REPO}:${MAJOR_MINOR}"
+                echo "${DOCKERHUB_REPO}:${MAJOR}"
+                echo "${DOCKERHUB_REPO}:latest"
+              fi
+            else
+              echo "::notice ::DOCKERHUB_TOKEN secret not set — skipping Docker Hub publish."
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.image_tags.outputs.tags }}
+          provenance: true
+          sbom: true
