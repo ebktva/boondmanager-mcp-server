@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.5.0] - 2026-06-12
+
+Les positionnements deviennent pleinement pilotables (lecture réparée, mise à jour d'état, actions liées), et les instances aux dictionnaires personnalisés peuvent déclarer leurs libellés. Merci @Antoine-Engibex pour les quatre contributions de cette version.
+
+### Added
+
+- **`boond_positionings_update`** (#108) : mise à jour d'un positionnement via `PUT /positionings/{id}` — état (`state`), motif (`stateReasonTypeOf`/`stateReasonDetail`, repliés en `stateReason {typeOf, detail}`), dates et commentaires. Permet de faire avancer un positionnement dans le pipeline (Positionned → CF Sent → RQ → Won…). Registration dédiée car l'API exige un PUT là où la crud-factory émet un PATCH ; contrat identique à la factory (annotations, `MutationOutputSchema`, `structuredContent {id, type}`). Le serveur expose désormais **175 outils**.
+- **Libellés de dictionnaire personnalisés** via `BOOND_DICTIONARY_OVERRIDES` (#105) : variable optionnelle (JSON inline ou chemin de fichier) déclarant le mapping label → ID par section (`action`/`state`) et par entité, pour les instances BoondManager dont les libellés sont personnalisés. Quand elle est configurée : `boond_actions_create` accepte un libellé pour `typeOf` (résolu selon l'entité `dependsOn`, erreur explicite avec les libellés disponibles si inconnu), les champs `state` des create/update (candidates, resources, companies, opportunities, projects) acceptent un libellé, les descriptions d'outils sont enrichies des tables label=ID, et une ressource MCP `boond://dictionary/overrides` expose la config. Fail-open (config absente/invalide → warn + comportement historique), résolution insensible à la casse. Exposée dans `user_config` du manifest MCPB ; documentation : `docs/dictionary-overrides.md`. Sans la variable, comportement inchangé à l'octet près.
+
+### Fixed
+
+- **Onglets tronqués au premier élément** (#107) : les outils d'onglets (ex. `boond_resources_positionings`, `boond_candidates_actions`) ne montraient que le premier élément des listes (`formatDetailResponse` ne lisait que `data[0]`). Nouveau formateur `formatTabResponse` (tableau → « N élément(s) » + toutes les entités, avec la troncature habituelle) appliqué aux boucles d'onglets des 6 entités principales.
+- **Filtres de `boond_positionings_search` silencieusement ignorés** (#107) : `GET /positionings` filtre par références dans `keywords` (`AO<id>`, `CAND<id>`, `COMP<id>`, `CSOC<id>`, `CCON<id>`, `PROD<id>`), pas par paramètres dédiés — une recherche « filtrée » renvoyait toute la base. Le handler convertit désormais `candidateId`/`resourceId`/`opportunityId`/`companyId`/`contactId`/`productId` en tokens keywords ; `projectId` est retiré (aucun équivalent API, il n'a jamais filtré).
+- **Actions liées à un positionnement impossibles à créer** (#106) : l'API rejette `POST /actions` en 422 « 1002 - Wrong or missing attribute (/data/relationships/positioning) » pour certains types d'action (ex. entretiens « RQ »), relation non documentée dans le schéma officiel. `boond_actions_create` accepte un `positioningId` optionnel et envoie la relation `positioning` correspondante ; sans lui, payload inchangé.
+
+### Changed
+
+- Comptes du catalogue alignés partout (README, manifests, CLAUDE.md) : **175 outils, 11 prompts, 22 ressources, 38 domaines**.
+
 ## [2.4.0] - 2026-06-10
 
 Six évolutions produit : documents/CV, sorties structurées, confirmation des suppressions, économie de tokens, healthcheck HTTP, et réparation du moniteur d'API.
