@@ -1,6 +1,6 @@
 {
   "formatVersion": 2,
-  "timestamp": "2026-06-10T20:34:38.086Z",
+  "timestamp": "2026-06-29T10:44:34.432Z",
   "url": "https://doc.boondmanager.com/api-externe/raml-build/",
   "endpointsCount": 152,
   "endpoints": [
@@ -468,8 +468,8 @@
     },
     {
       "path": "resources/logs/search.raml",
-      "sha256": "945b35be44e2ca3e7adae213256583e44a15ec38d9a0c4f3666a217de5856f78",
-      "bytes": 11055,
+      "sha256": "c70dd7448db90ae5a6ede1aea92eed6a4f126b587ddf0ae1ed1464aade758197",
+      "bytes": 11206,
       "description": "Search logs"
     },
     {
