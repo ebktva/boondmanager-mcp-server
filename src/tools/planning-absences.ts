@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SearchSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse } from "../services/boond-client.js";
+import { apiSearch, buildSearchQuery, formatListResponse } from "../services/boond-client.js";
 
 export function registerPlanningAbsenceTools(server: McpServer): void {
   server.registerTool(
@@ -20,7 +20,7 @@ Returns: Planning des absences.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/planning-absences", "GET", undefined, query);
+      const response = await apiSearch("/planning-absences", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "planning absence") }],
       };

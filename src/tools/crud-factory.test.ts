@@ -9,12 +9,12 @@ import {
   registerUpdateTool,
   registerDeleteTool,
 } from "./crud-factory.js";
-import { apiRequest } from "../services/boond-client.js";
+import { apiRequest, apiSearch } from "../services/boond-client.js";
 import { z } from "zod";
 
 vi.mock("../services/boond-client.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/boond-client.js")>();
-  return { ...actual, apiRequest: vi.fn() };
+  return { ...actual, apiRequest: vi.fn(), apiSearch: vi.fn() };
 });
 
 function createMockServer() {
@@ -263,7 +263,7 @@ describe("registerSearchTool handler", () => {
   };
 
   it("returns text summary plus compact structuredContent", async () => {
-    vi.mocked(apiRequest).mockResolvedValue(RESPONSE);
+    vi.mocked(apiSearch).mockResolvedValue(RESPONSE);
     const server = createMockServer();
     registerSearchTool(server, OPTS);
     const result = await registeredHandler(server)({ keywords: "dupont" });
@@ -281,7 +281,7 @@ describe("registerSearchTool handler", () => {
   });
 
   it("projects `fields` into both text and structuredContent, and keeps it out of the API query", async () => {
-    vi.mocked(apiRequest).mockResolvedValue(RESPONSE);
+    vi.mocked(apiSearch).mockResolvedValue(RESPONSE);
     const server = createMockServer();
     registerSearchTool(server, OPTS);
     const result = await registeredHandler(server)({ keywords: "dupont", fields: ["title", "unknownField"] });
@@ -292,8 +292,8 @@ describe("registerSearchTool handler", () => {
     const structured = result.structuredContent as { items: Array<Record<string, unknown>> };
     expect(structured.items[0].attributes).toEqual({ title: "Dev" });
     expect(structured.items[0].summary).toBeUndefined();
-    // API query: `fields` is client-side only
-    const [, , , query] = vi.mocked(apiRequest).mock.calls[0];
+    // API query: `fields` is client-side only. Search goes through apiSearch(path, query).
+    const [, query] = vi.mocked(apiSearch).mock.calls[0];
     expect(query).not.toHaveProperty("fields");
     expect(query).not.toHaveProperty("fields[]");
   });

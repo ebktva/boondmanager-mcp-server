@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMockServer, registeredToolNames, toolCallback } from "./test-helpers.js";
 import { registerDeliveryTools } from "./deliveries.js";
-import { apiRequest } from "../services/boond-client.js";
+import { apiRequest, apiSearch } from "../services/boond-client.js";
 
 vi.mock("../services/boond-client.js", () => ({
   apiRequest: vi.fn().mockResolvedValue({ data: { id: "21", type: "delivery", attributes: {} } }),
+  apiSearch: vi.fn().mockResolvedValue({ data: [] }),
   buildSearchQuery: vi.fn((params: Record<string, unknown>) => params),
   formatListResponse: vi.fn().mockReturnValue(""),
   formatDetailResponse: vi.fn().mockReturnValue(""),
@@ -44,8 +45,8 @@ describe("registerDeliveryTools", () => {
   it("search should call the BoondManager API on the deliveries groupments path", async () => {
     registerDeliveryTools(server);
     await toolCallback(server, "boond_deliveries_search")({ page: 2, pageSize: 10 });
-    expect(vi.mocked(apiRequest).mock.calls[0][0]).toBe("/deliveries-groupments");
-    expect(vi.mocked(apiRequest).mock.calls[0][1]).toBe("GET");
+    // Search goes through apiSearch (per-route maxResults chunking).
+    expect(vi.mocked(apiSearch).mock.calls[0][0]).toBe("/deliveries-groupments");
   });
 
   it("get should call the BoondManager API on the detail path", async () => {

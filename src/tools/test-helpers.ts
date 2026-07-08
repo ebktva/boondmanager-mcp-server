@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiRequest } from "../services/boond-client.js";
+import { apiRequest, apiSearch } from "../services/boond-client.js";
 
 /**
  * Shared test utilities for tool-registration suites.
@@ -10,12 +10,13 @@ import { apiRequest } from "../services/boond-client.js";
  *
  *   vi.mock("../services/boond-client.js", async (importOriginal) => {
  *     const actual = await importOriginal<typeof import("../services/boond-client.js")>();
- *     return { ...actual, apiRequest: vi.fn() };
+ *     return { ...actual, apiRequest: vi.fn(), apiSearch: vi.fn() };
  *   });
  *
- * That way `apiRequest` is a spy (so we can assert on the path/method it is
- * called with) while `buildSearchQuery` / `formatListResponse` run for real,
- * exercising the domain tool's callback end-to-end.
+ * `apiRequest` (used by the get tool) and `apiSearch` (used by the search tool,
+ * which chunks per-route — see ROUTE_MAX_RESULTS) are spies so we can assert on
+ * the path they are called with, while `buildSearchQuery` / `formatListResponse`
+ * run for real, exercising the domain tool's callback end-to-end.
  */
 export function createMockServer(): McpServer {
   return {
@@ -66,6 +67,7 @@ export function describeSearchGetTools(label: string, contract: SearchGetContrac
     beforeEach(() => {
       server = createMockServer();
       vi.mocked(apiRequest).mockReset();
+      vi.mocked(apiSearch).mockReset();
     });
 
     it("should register 2 tools", () => {
@@ -89,12 +91,13 @@ export function describeSearchGetTools(label: string, contract: SearchGetContrac
     });
 
     it("search should call the BoondManager API on the search path", async () => {
-      vi.mocked(apiRequest).mockResolvedValue({ data: [] });
+      vi.mocked(apiSearch).mockResolvedValue({ data: [] });
       contract.registrar(server);
       await toolCallback(server, searchTool)({ page: 2, pageSize: 10 });
-      const call = vi.mocked(apiRequest).mock.calls[0];
+      // Search goes through apiSearch (per-route maxResults chunking), not a raw
+      // apiRequest, so the route cap is always applied.
+      const call = vi.mocked(apiSearch).mock.calls[0];
       expect(call[0]).toBe(contract.searchPath);
-      expect(call[1]).toBe("GET");
     });
 
     it("get should call the BoondManager API on the detail path", async () => {

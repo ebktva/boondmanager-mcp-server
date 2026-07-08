@@ -4,7 +4,7 @@ import { registerAgencyTools } from "./agencies.js";
 
 vi.mock("../services/boond-client.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/boond-client.js")>();
-  return { ...actual, apiRequest: vi.fn() };
+  return { ...actual, apiRequest: vi.fn(), apiSearch: vi.fn() };
 });
 
 describeSearchGetTools("registerAgencyTools", {

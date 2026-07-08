@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IdSchema, NotificationSearchSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 
 export function registerNotificationTools(server: McpServer): void {
   server.registerTool(
@@ -27,7 +33,7 @@ Returns: Liste des notifications correspondantes.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/notifications", "GET", undefined, query);
+      const response = await apiSearch("/notifications", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "notification") }],
       };

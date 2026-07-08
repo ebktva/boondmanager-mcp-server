@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Respect du plafond `maxResults` de BoondManager sur la route `/actions`** : l'équipe technique de BoondManager a signalé que des appels à `/api/actions` avec `maxResults > 100` provoquent des dépassements mémoire de leur côté (alertes internes, puis repli silencieux sur 30). Les outils de recherche ne passent plus directement par `apiRequest` mais par une nouvelle couche `apiSearch` qui applique un plafond `maxResults` par route (`ROUTE_MAX_RESULTS` dans `src/constants.ts`, `/actions` → 100). Quand la taille de page demandée dépasse le plafond de la route, la requête est **découpée de façon transparente** en tranches ≤ plafond, puis les pages sont fusionnées : l'appelant reçoit sa page complète (jusqu'à 500) « d'un coup », mais BoondManager ne reçoit jamais `maxResults` au-delà du plafond. Aucune régression sur les autres routes (chemin rapide à appel unique, plafond par défaut = `MAX_PAGE_SIZE`). Pour plafonner une future route, il suffit d'ajouter une entrée à `ROUTE_MAX_RESULTS`.
+
 ## [2.8.0] - 2026-06-29
 
 Extension des capacités d'écriture (4 nouveaux outils `*_create`) et nouveau mode d'authentification statique pour le transport HTTP. Catalogue : **180 outils** (176 → 180), 11 prompts, 22 ressources.

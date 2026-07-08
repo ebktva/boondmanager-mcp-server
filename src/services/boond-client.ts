@@ -2,6 +2,9 @@ import { createHmac } from "crypto";
 import {
   DEFAULT_BASE_URL,
   CHARACTER_LIMIT,
+  DEFAULT_PAGE_SIZE,
+  ROUTE_MAX_RESULTS,
+  DEFAULT_MAX_RESULTS,
   DEFAULT_HTTP_TIMEOUT_MS,
   DEFAULT_HTTP_MAX_RETRIES,
   DEFAULT_HTTP_RETRY_BASE_MS,
@@ -9,7 +12,7 @@ import {
   DEFAULT_HTTP_RATE_LIMIT_RPS,
   DEFAULT_HTTP_RATE_LIMIT_BURST,
 } from "../constants.js";
-import type { BoondAuthProvider, BoondConfig, JsonApiResponse, SearchParams } from "../types.js";
+import type { BoondAuthProvider, BoondConfig, JsonApiResource, JsonApiResponse, SearchParams } from "../types.js";
 import { TokenBucket } from "./rate-limiter.js";
 import { oauthContext } from "./oauth.js";
 
@@ -789,6 +792,54 @@ export function buildSearchQuery(params: SearchParams): Record<string, QueryValu
   }
 
   return query;
+}
+
+/**
+ * Search wrapper around `apiRequest` that enforces BoondManager's per-route
+ * `maxResults` ceiling (see `ROUTE_MAX_RESULTS`). When the caller requests more
+ * results than the route allows, the request is transparently split into
+ * chunks of `cap` records and the pages are merged into a single JSON:API
+ * response — the caller still receives the full page, but BoondManager never
+ * sees `maxResults` above the cap (which overflows memory on `/actions`).
+ *
+ * Routes whose ceiling already covers the requested page size take the fast
+ * path: a single `apiRequest`, byte-for-byte identical to calling it directly.
+ * The chunk count is bounded by `ceil((offset + requested) / cap)`, so there is
+ * no unbounded loop; the loop also stops early once a page comes back short
+ * (end of the result set on the server).
+ */
+export async function apiSearch(path: string, query: Record<string, QueryValue>): Promise<JsonApiResponse> {
+  const cap = ROUTE_MAX_RESULTS[path] ?? DEFAULT_MAX_RESULTS;
+  const requested = typeof query["maxResults"] === "number" ? query["maxResults"] : DEFAULT_PAGE_SIZE;
+  const page = typeof query["page"] === "number" ? query["page"] : 1;
+
+  // Fast path: one call, maxResults left exactly as the caller built it.
+  if (requested <= cap) {
+    return apiRequest(path, "GET", undefined, query);
+  }
+
+  // Chunked path: fetch `requested` records starting at the absolute offset
+  // implied by (page, requested), in BoondManager pages of `cap` records.
+  const startRow = (page - 1) * requested;
+  const firstBoondPage = Math.floor(startRow / cap) + 1;
+  const offsetInFirstChunk = startRow % cap;
+  const needed = offsetInFirstChunk + requested;
+
+  const collected: JsonApiResource[] = [];
+  let meta: JsonApiResponse["meta"];
+
+  for (let i = 0; collected.length < needed; i++) {
+    const chunkQuery: Record<string, QueryValue> = { ...query, page: firstBoondPage + i, maxResults: cap };
+    const response = await apiRequest(path, "GET", undefined, chunkQuery);
+    if (meta === undefined) meta = response.meta;
+    const chunk = Array.isArray(response.data) ? response.data : response.data ? [response.data] : [];
+    collected.push(...chunk);
+    // A short page means there is no more data on the server — stop early.
+    if (chunk.length < cap) break;
+  }
+
+  const data = collected.slice(offsetInFirstChunk, offsetInFirstChunk + requested);
+  return meta !== undefined ? { data, meta } : { data };
 }
 
 export function formatEntitySummary(entity: unknown): string {

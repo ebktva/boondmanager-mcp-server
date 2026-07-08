@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   apiRequest,
+  apiSearch,
   buildSearchQuery,
   formatListResponse,
   formatDetailResponse,
@@ -186,7 +187,9 @@ Returns: Liste des ${opts.entityNamePlural} correspondants avec leur ID, nom et 
     async (params: unknown) => {
       const p = params as SearchInput & { fields?: string[] };
       const query = buildSearchQuery(p);
-      const response = await apiRequest(opts.apiPath, "GET", undefined, query);
+      // apiSearch respects BoondManager's per-route maxResults ceiling,
+      // chunking large requests transparently (see ROUTE_MAX_RESULTS).
+      const response = await apiSearch(opts.apiPath, query);
       const text = formatListResponse(response, opts.entityName, p.fields);
       return {
         content: [{ type: "text" as const, text }],

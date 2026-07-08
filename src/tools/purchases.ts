@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IdSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 import { buildJsonApiBody, registerDeleteTool } from "./crud-factory.js";
 import { z } from "zod";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SEARCH_PAGE } from "../constants.js";
@@ -50,7 +56,7 @@ Returns: Liste des achats correspondants.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/purchases", "GET", undefined, query);
+      const response = await apiSearch("/purchases", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "achat") }],
       };
