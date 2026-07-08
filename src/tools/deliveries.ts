@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DeliverySearchSchema, IdSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 import { buildJsonApiBody } from "./crud-factory.js";
 import { z } from "zod";
 
@@ -85,7 +91,7 @@ Returns: Liste des livraisons correspondantes.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/deliveries-groupments", "GET", undefined, query);
+      const response = await apiSearch("/deliveries-groupments", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "livraison") }],
       };

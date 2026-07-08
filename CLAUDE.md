@@ -149,6 +149,15 @@ All search tools enforce a **maximum page number of 100** (configurable via `MAX
 
 **Enforcement:** Zod schemas reject `page > MAX_SEARCH_PAGE` at input validation (before the API call). The model sees a clear schema error mentioning the limit, not a silent clamp or a cryptic API 400.
 
+### Per-route `maxResults` ceiling (transparent chunking)
+
+Some BoondManager routes cannot safely return large pages. `/actions` in particular overflows BoondManager's memory when `maxResults > 100` (their tech team reported internal alerts + a silent fallback to 30). To respect this **without** degrading usability, search tools do not go through `apiRequest` directly — they call `apiSearch(path, query)` (`src/services/boond-client.ts`).
+
+- `ROUTE_MAX_RESULTS` in `src/constants.ts` maps an API path to its safe ceiling (`/actions` → 100). Routes absent from the map use `DEFAULT_MAX_RESULTS` (= `MAX_PAGE_SIZE`, 500).
+- **Fast path:** when the requested `pageSize` is ≤ the route ceiling (every non-capped route, and small `/actions` requests), `apiSearch` makes a single `apiRequest` — byte-for-byte identical to before.
+- **Chunked path:** when `pageSize` exceeds the ceiling (e.g. 500 on `/actions`), `apiSearch` fetches the requested window in chunks of `cap` records (each API call sends `maxResults = cap`, never more), merges the pages into one `JsonApiResponse`, and returns it. The caller still receives its full page "at once"; BoondManager never sees `maxResults` above the cap. Chunk count is bounded by `ceil((offset + requested) / cap)` and the loop stops early on a short page.
+- To cap a future route, add one entry to `ROUTE_MAX_RESULTS`; no other code changes needed. Search-tool `pageSize` stays uniformly capped at `MAX_PAGE_SIZE`.
+
 ## Tool Naming Convention
 
 All tool names follow: `boond_{domain}_{operation}`

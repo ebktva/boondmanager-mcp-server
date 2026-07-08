@@ -8,6 +8,7 @@ import {
   initClient,
   buildJwt,
   apiRequest,
+  apiSearch,
   parseBoondErrorBody,
   formatApiError,
   resolveTimeoutMs,
@@ -602,6 +603,123 @@ describe("apiRequest", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(networkErr));
 
     await expect(apiRequest("/candidates")).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("apiSearch (per-route maxResults chunking)", () => {
+  // Mock fetch as a paginated backend: page N with maxResults M returns rows
+  // [(N-1)*M, N*M) as resources whose id === their absolute 0-based row index,
+  // capped at `totalRows`. This lets us assert both the chunk boundaries sent
+  // to the API and the absolute window returned to the caller.
+  function pagedFetch(totalRows: number) {
+    return vi.fn().mockImplementation((url: string) => {
+      const u = new URL(url);
+      const max = Number(u.searchParams.get("maxResults") ?? "30");
+      const page = Number(u.searchParams.get("page") ?? "1");
+      const start = (page - 1) * max;
+      const items = [];
+      for (let i = start; i < Math.min(start + max, totalRows); i++) {
+        items.push({ id: String(i), type: "action", attributes: {} });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-length": "100" }),
+        json: () => Promise.resolve({ data: items, meta: { totals: { rows: totalRows } } }),
+      });
+    });
+  }
+
+  const maxResultsOf = (call: unknown[]) => Number(new URL(call[0] as string).searchParams.get("maxResults"));
+  const pageOf = (call: unknown[]) => Number(new URL(call[0] as string).searchParams.get("page"));
+
+  beforeEach(() => {
+    process.env.BOOND_API_TOKEN = "test-token";
+    process.env.BOOND_HTTP_MAX_RETRIES = "0";
+    process.env.BOOND_HTTP_RATE_LIMIT_RPS = "0";
+    resetRateLimiterForTests();
+    initClient();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.BOOND_API_TOKEN;
+    delete process.env.BOOND_HTTP_MAX_RETRIES;
+    delete process.env.BOOND_HTTP_RATE_LIMIT_RPS;
+    resetRateLimiterForTests();
+  });
+
+  it("takes the fast path (single call) for non-capped routes even at pageSize 500", async () => {
+    vi.stubGlobal("fetch", pagedFetch(2000));
+
+    const res = await apiSearch("/candidates", { maxResults: 500, page: 1 });
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(maxResultsOf(vi.mocked(fetch).mock.calls[0])).toBe(500);
+    expect(Array.isArray(res.data) ? res.data.length : 0).toBe(500);
+  });
+
+  it("takes the fast path when the /actions request is within the cap", async () => {
+    vi.stubGlobal("fetch", pagedFetch(2000));
+
+    await apiSearch("/actions", { maxResults: 100, page: 1 });
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(maxResultsOf(vi.mocked(fetch).mock.calls[0])).toBe(100);
+  });
+
+  it("chunks a large /actions request into calls that never exceed maxResults 100", async () => {
+    vi.stubGlobal("fetch", pagedFetch(2000));
+
+    const res = await apiSearch("/actions", { maxResults: 500, page: 1 });
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls).toHaveLength(5);
+    for (const call of calls) expect(maxResultsOf(call)).toBeLessThanOrEqual(100);
+    expect(calls.map(pageOf)).toEqual([1, 2, 3, 4, 5]);
+
+    const data = res.data as { id: string }[];
+    expect(data).toHaveLength(500);
+    expect(data[0].id).toBe("0");
+    expect(data[499].id).toBe("499");
+    // Grand total from the server survives the merge.
+    expect(res.meta?.totals?.rows).toBe(2000);
+  });
+
+  it("stops early when the server returns a short page", async () => {
+    vi.stubGlobal("fetch", pagedFetch(250));
+
+    const res = await apiSearch("/actions", { maxResults: 500, page: 1 });
+
+    // 100 + 100 + 50 → third page is short, so we stop after 3 calls.
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+    expect((res.data as unknown[]).length).toBe(250);
+  });
+
+  it("honours page > 1 with the correct absolute offset", async () => {
+    vi.stubGlobal("fetch", pagedFetch(2000));
+
+    const res = await apiSearch("/actions", { maxResults: 500, page: 2 });
+
+    // Rows 500..999 → Boond pages 6..10 at 100/page.
+    expect(vi.mocked(fetch).mock.calls.map(pageOf)).toEqual([6, 7, 8, 9, 10]);
+    const data = res.data as { id: string }[];
+    expect(data).toHaveLength(500);
+    expect(data[0].id).toBe("500");
+    expect(data[499].id).toBe("999");
+  });
+
+  it("slices a non-zero offset inside the first chunk", async () => {
+    vi.stubGlobal("fetch", pagedFetch(2000));
+
+    // page 2 × 150 → startRow 150 → first Boond page 2, offset 50 within it.
+    const res = await apiSearch("/actions", { maxResults: 150, page: 2 });
+
+    expect(vi.mocked(fetch).mock.calls.map(pageOf)).toEqual([2, 3]);
+    const data = res.data as { id: string }[];
+    expect(data).toHaveLength(150);
+    expect(data[0].id).toBe("150");
+    expect(data[149].id).toBe("299");
   });
 });
 

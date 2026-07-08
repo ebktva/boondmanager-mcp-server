@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ActionSearchSchema, ActionCreateSchema, ActionUpdateSchema, IdSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 import { buildJsonApiBody, registerDeleteTool, MutationOutputSchema } from "./crud-factory.js";
 import { availableLabels, formatOverridesSummary, resolveLabel } from "../config/dictionary-overrides.js";
 
@@ -52,7 +58,9 @@ Returns: Liste des actions correspondantes.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/actions", "GET", undefined, query);
+      // apiSearch chunks the request to respect BoondManager's 100-result cap
+      // on /actions (heavy objects → memory overflow above 100).
+      const response = await apiSearch("/actions", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "action") }],
       };

@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AdvantageSearchSchema, IdSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 
 export function registerAdvantageTools(server: McpServer): void {
   // Search advantages
@@ -26,7 +32,7 @@ Returns: Liste des avantages correspondants.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/advantages", "GET", undefined, query);
+      const response = await apiSearch("/advantages", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "avantage") }],
       };

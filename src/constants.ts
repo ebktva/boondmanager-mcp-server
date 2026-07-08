@@ -4,6 +4,19 @@ export const CHARACTER_LIMIT = 50000;
 export const DEFAULT_PAGE_SIZE = 30;
 export const MAX_PAGE_SIZE = 500;
 
+// Per-route safe ceiling for the BoondManager `maxResults` query parameter.
+// Some routes return very heavy objects: on /actions, maxResults > 100 triggers
+// memory overflows on BoondManager's side (internal alerts, then a silent
+// fallback to 30) — reported by their tech team. When a search requests more
+// than a route's ceiling, the apiSearch layer fetches it in chunks of that size
+// and merges the pages, so the caller still gets the full page while we never
+// send maxResults above the cap. A route absent from this map uses
+// DEFAULT_MAX_RESULTS. Keys are the API paths as passed to apiRequest/apiSearch.
+export const ROUTE_MAX_RESULTS: Record<string, number> = {
+  "/actions": 100,
+};
+export const DEFAULT_MAX_RESULTS = MAX_PAGE_SIZE;
+
 // Cap the page number on search tools (openWorldHint) to prevent runaway
 // iterations. At 500 results/page, page 100 = 50k records — well beyond
 // typical interactive exploration. The model can refine filters instead.

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTimesheetSchema, TimesheetSearchSchema, TimesheetGetSchema } from "../schemas/index.js";
 import type { ResourceTimesheetInput, TimesheetSearchInput, TimesheetGetInput } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatDetailResponse } from "../services/boond-client.js";
+import { apiRequest, apiSearch, buildSearchQuery, formatDetailResponse } from "../services/boond-client.js";
 import { buildJsonApiBody } from "./crud-factory.js";
 import { CHARACTER_LIMIT } from "../constants.js";
 import type { JsonApiResponse } from "../types.js";
@@ -153,7 +153,7 @@ Returns: Liste des feuilles de temps correspondantes.`,
     },
     async (params: TimesheetSearchInput) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/times-reports", "GET", undefined, query);
+      const response = await apiSearch("/times-reports", query);
       const text = formatTimesheetSummary(response);
       return {
         content: [{ type: "text" as const, text }],

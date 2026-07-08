@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IdSchema, ValidationSearchSchema } from "../schemas/index.js";
-import { apiRequest, buildSearchQuery, formatListResponse, formatDetailResponse } from "../services/boond-client.js";
+import {
+  apiRequest,
+  apiSearch,
+  buildSearchQuery,
+  formatListResponse,
+  formatDetailResponse,
+} from "../services/boond-client.js";
 
 export function registerValidationTools(server: McpServer): void {
   server.registerTool(
@@ -30,7 +36,7 @@ Returns: Liste des validations correspondantes.`,
     },
     async (params) => {
       const query = buildSearchQuery(params);
-      const response = await apiRequest("/validations", "GET", undefined, query);
+      const response = await apiSearch("/validations", query);
       return {
         content: [{ type: "text" as const, text: formatListResponse(response, "validation") }],
       };

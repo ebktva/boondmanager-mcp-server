@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerActionTools } from "./actions.js";
-import { apiRequest } from "../services/boond-client.js";
+import { apiRequest, apiSearch, buildSearchQuery } from "../services/boond-client.js";
 import { resetDictionaryOverridesForTests } from "../config/dictionary-overrides.js";
 
 vi.mock("../services/boond-client.js", () => ({
   apiRequest: vi.fn().mockResolvedValue({ data: { id: "123", type: "action" } }),
+  apiSearch: vi.fn().mockResolvedValue({ data: [] }),
   buildSearchQuery: vi.fn().mockReturnValue({}),
   formatListResponse: vi.fn().mockReturnValue(""),
   formatDetailResponse: vi.fn().mockReturnValue(""),
@@ -63,6 +64,31 @@ describe("registerActionTools", () => {
     registerActionTools(server);
     const deleteCall = vi.mocked(server.registerTool).mock.calls.find((c) => c[0] === "boond_actions_delete");
     expect(deleteCall?.[1].annotations?.destructiveHint).toBe(true);
+  });
+
+  describe("boond_actions_search handler", () => {
+    function getSearchHandler() {
+      registerActionTools(server);
+      const call = vi.mocked(server.registerTool).mock.calls.find((c) => c[0] === "boond_actions_search");
+      return call?.[2] as (params: Record<string, unknown>) => Promise<{
+        content: Array<{ type: string; text: string }>;
+      }>;
+    }
+
+    beforeEach(() => {
+      vi.mocked(apiSearch).mockClear();
+      vi.mocked(buildSearchQuery).mockClear();
+    });
+
+    it("routes /actions search through apiSearch (per-route chunking), not a raw apiRequest", async () => {
+      const handler = getSearchHandler();
+      vi.mocked(buildSearchQuery).mockReturnValueOnce({ maxResults: 500, page: 1 });
+
+      await handler({ pageSize: 500 });
+
+      expect(apiSearch).toHaveBeenCalledWith("/actions", { maxResults: 500, page: 1 });
+      expect(apiRequest).not.toHaveBeenCalledWith("/actions", "GET", undefined, expect.anything());
+    });
   });
 
   describe("boond_actions_create handler", () => {
