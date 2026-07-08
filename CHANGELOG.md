@@ -3,11 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.8.1] - 2026-07-08
+
+Correctif du plafond `maxResults` par route (signalement de l'équipe technique BoondManager) et mises à jour de maintenance (Dependabot). Catalogue inchangé : **180 outils, 11 prompts, 22 ressources**.
 
 ### Fixed
 
-- **Respect du plafond `maxResults` de BoondManager sur la route `/actions`** : l'équipe technique de BoondManager a signalé que des appels à `/api/actions` avec `maxResults > 100` provoquent des dépassements mémoire de leur côté (alertes internes, puis repli silencieux sur 30). Les outils de recherche ne passent plus directement par `apiRequest` mais par une nouvelle couche `apiSearch` qui applique un plafond `maxResults` par route (`ROUTE_MAX_RESULTS` dans `src/constants.ts`, `/actions` → 100). Quand la taille de page demandée dépasse le plafond de la route, la requête est **découpée de façon transparente** en tranches ≤ plafond, puis les pages sont fusionnées : l'appelant reçoit sa page complète (jusqu'à 500) « d'un coup », mais BoondManager ne reçoit jamais `maxResults` au-delà du plafond. Aucune régression sur les autres routes (chemin rapide à appel unique, plafond par défaut = `MAX_PAGE_SIZE`). Pour plafonner une future route, il suffit d'ajouter une entrée à `ROUTE_MAX_RESULTS`.
+- **Respect du plafond `maxResults` de BoondManager sur la route `/actions`** ([#148](https://github.com/fauguste/boondmanager-mcp-server/pull/148)) : l'équipe technique de BoondManager a signalé que des appels à `/api/actions` avec `maxResults > 100` provoquent des dépassements mémoire de leur côté (alertes internes, puis repli silencieux sur 30). Les outils de recherche ne passent plus directement par `apiRequest` mais par une nouvelle couche `apiSearch` qui applique un plafond `maxResults` par route (`ROUTE_MAX_RESULTS` dans `src/constants.ts`, `/actions` → 100). Quand la taille de page demandée dépasse le plafond de la route, la requête est **découpée de façon transparente** en tranches ≤ plafond, puis les pages sont fusionnées : l'appelant reçoit sa page complète (jusqu'à 500) « d'un coup », mais BoondManager ne reçoit jamais `maxResults` au-delà du plafond. Aucune régression sur les autres routes (chemin rapide à appel unique, plafond par défaut = `MAX_PAGE_SIZE`). Pour plafonner une future route, il suffit d'ajouter une entrée à `ROUTE_MAX_RESULTS`.
+
+### Changed
+
+- **Dev-dependencies** ([#144](https://github.com/fauguste/boondmanager-mcp-server/pull/144), [#146](https://github.com/fauguste/boondmanager-mcp-server/pull/146)) : mise à jour de la chaîne de build/test (vitest, typescript-eslint, @types/node, …) — lockfile uniquement, rien n'est embarqué dans le paquet publié.
+- **GitHub Actions** ([#139](https://github.com/fauguste/boondmanager-mcp-server/pull/139), [#140](https://github.com/fauguste/boondmanager-mcp-server/pull/140), [#143](https://github.com/fauguste/boondmanager-mcp-server/pull/143), [#145](https://github.com/fauguste/boondmanager-mcp-server/pull/145), [#147](https://github.com/fauguste/boondmanager-mcp-server/pull/147)) : bump de `codeql-action` (4.36.3), `docker/build-push-action` (7.3.0), `docker/login-action` (4.4.0), `docker/setup-qemu-action` (4.2.0), `docker/setup-buildx-action` ; regroupement des mises à jour d'actions Dependabot ([#145](https://github.com/fauguste/boondmanager-mcp-server/pull/145)).
+- **Image Docker** : la reconstruction embarque les derniers correctifs de l'image de base Node.
 
 ## [2.8.0] - 2026-06-29
 
